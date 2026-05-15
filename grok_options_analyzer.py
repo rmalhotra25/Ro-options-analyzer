@@ -1,38 +1,27 @@
 import streamlit as st
 import yfinance as yf
-import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
-from datetime import datetime
 
 st.set_page_config(page_title="Grok Options Analyzer", layout="wide")
 st.title("🚀 Grok High-Conviction Options Analyzer")
 
-ticker_input = st.sidebar.text_input("Stock Ticker (e.g. SMCI)", value="SMCI").upper().strip()
+ticker = st.sidebar.text_input("Enter Ticker (SMCI or BMNR)", value="SMCI").upper().strip()
 
-@st.cache_data(ttl=120, show_spinner=False)
-def get_data(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        hist = stock.history(period="1y")
-        options_dates = stock.options
-        return stock, info, hist, options_dates
-    except Exception as e:
-        st.error(f"Data error: {str(e)[:100]}")
-        return None, None, None, None
+# No heavy caching
+stock = yf.Ticker(ticker)
+info = stock.info
+hist = stock.history(period="1y")
+opt_dates = stock.options
 
-stock, info, hist, opt_dates = get_data(ticker_input)
+current_price = info.get('currentPrice') or info.get('regularMarketPrice', 0)
 
-if not info:
-    st.warning("Could not load data. Try refreshing or using a popular ticker like AAPL, NVDA, or SMCI.")
+if current_price == 0:
+    st.error("Could not load data. Try SMCI, BMNR, AAPL or NVDA")
     st.stop()
 
-current_price = info.get('currentPrice') or info.get('regularMarketPrice', 100)
+st.success(f"✅ Loaded {ticker} — Current Price: **${current_price:.2f}**")
 
-st.success(f"✅ {ticker_input} at ${current_price:.2f}")
-
-tab1, tab2, tab3 = st.tabs(["📊 Analysis", "📈 Options Chain", "🔥 Covered Call"])
+tab1, tab2, tab3 = st.tabs(["📊 Chart", "📈 Options Chain", "🔥 Covered Call"])
 
 with tab1:
     st.subheader("1-Year Price Chart")
@@ -41,18 +30,20 @@ with tab1:
 
 with tab2:
     if opt_dates:
-        expiry = st.selectbox("Select Expiration", opt_dates)
+        expiry = st.selectbox("Expiration Date", opt_dates)
         chain = stock.option_chain(expiry)
-        st.dataframe(chain.calls[["strike", "lastPrice", "bid", "ask", "impliedVolatility", "volume"]].head(15), use_container_width=True)
+        st.dataframe(chain.calls[["strike", "lastPrice", "bid", "ask", "impliedVolatility", "volume"]].head(20), use_container_width=True)
 
 with tab3:
-    st.subheader("Covered Call Recommendation")
-    st.success(f"**For your 100 shares of {ticker_input}**")
-    st.write("Sell **1 call contract** (30-45 days out, 3-7% above current price)")
-    st.write("This generates immediate income while you keep the shares unless assigned.")
-    if ticker_input == "SMCI":
-        st.info("SMCI has high IV right now — good premiums expected.")
-    elif ticker_input == "BMNR":
-        st.info("BMNR is volatile — excellent premium potential.")
+    st.subheader("Covered Call Strategy for Your 100 Shares")
+    st.success(f"**Recommended for {ticker}**")
+    st.write("**Strategy**: Sell **1 call contract** (30–45 days until expiration)")
+    st.write("- Choose a strike **3–7% above** current price")
+    st.write("- Collect premium immediately (income for retirement)")
+    st.write("- Keep shares unless stock rises above strike")
+    if ticker == "SMCI":
+        st.info("SMCI currently has high volatility → **Excellent premiums** right now")
+    elif ticker == "BMNR":
+        st.info("BMNR is volatile → Strong income potential from covered calls")
 
-st.caption("Educational tool only • Not financial advice • Refresh if data is slow")
+st.caption("Educational tool only • Not financial advice • Pull down to refresh")
